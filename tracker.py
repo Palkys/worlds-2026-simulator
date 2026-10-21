@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import random
 
 st.set_page_config(page_title="Worlds 2026 Swiss Bracket", layout="wide")
 
@@ -25,17 +26,28 @@ if "app_version" not in st.session_state:
 v = st.session_state["app_version"]
 
 # Hlavička s tlačítkem pro Reset
+# Hlavička s tlačítkem pro Reset
 col_title, col_btn = st.columns([5, 1])
 with col_title:
     st.title("🏆 LoL Worlds 2026 - Kompletní Swiss Stage")
 with col_btn:
-    # Opravený reset: vymaže vše a zvedne verzi, čímž vynutí smazání zobrazených tlačítek
+    # NEPRŮSTŘELNÝ RESET
     if st.button("🔄 Začít znovu", use_container_width=True):
-        next_v = st.session_state.get("app_version", 1) + 1
-        st.session_state.clear()
-        st.session_state["app_version"] = next_v
+        # 1. Smazat soubor
         if os.path.exists(STATE_FILE):
-            os.remove(STATE_FILE)
+            try:
+                os.remove(STATE_FILE)
+            except:
+                pass
+        
+        # 2. Brutální smazání naprosto všech proměnných v paměti
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+            
+        # 3. Zvednutí verze pro vynucení překreslení nových tlačítek
+        st.session_state["app_version"] = random.randint(1000, 9999) 
+        
+        # 4. Restart
         st.rerun()
 
 st.write("Vyberte vítěze z každého zápasu. Váš postup se automaticky ukládá – i po obnovení stránky (F5) zůstane vše vyplněné.")
