@@ -15,17 +15,25 @@ if "loaded" not in st.session_state:
                 for k, v in saved_data.items():
                     st.session_state[k] = v
         except:
-            pass # Pokud by byl soubor poškozený, ignorujeme ho
+            pass
     st.session_state["loaded"] = True
+
+# Inicializace čísla verze (slouží k bezpečnému restartování tlačítek)
+if "app_version" not in st.session_state:
+    st.session_state["app_version"] = 1
+
+v = st.session_state["app_version"]
 
 # Hlavička s tlačítkem pro Reset
 col_title, col_btn = st.columns([5, 1])
 with col_title:
     st.title("🏆 LoL Worlds 2026 - Kompletní Swiss Stage")
 with col_btn:
-    # Tlačítko pro vymazání celé historie (reset aplikace i souboru)
+    # Opravený reset: vymaže vše a zvedne verzi, čímž vynutí smazání zobrazených tlačítek
     if st.button("🔄 Začít znovu", use_container_width=True):
+        next_v = st.session_state.get("app_version", 1) + 1
         st.session_state.clear()
+        st.session_state["app_version"] = next_v
         if os.path.exists(STATE_FILE):
             os.remove(STATE_FILE)
         st.rerun()
@@ -42,7 +50,6 @@ round_1_matches = [
 
 all_teams = [t for match in round_1_matches for t in match]
 
-# Dynamické proměnné pro skóre a historii
 scores = {team: {'W': 0, 'L': 0} for team in all_teams}
 history = {team: set() for team in all_teams}
 
@@ -59,8 +66,8 @@ def render_pool(pool_name, matches, round_num):
     
     for i, match in enumerate(matches):
         with st.container(border=True):
-            # U první skupiny se index None použije jen, pokud hodnota není v session_state
-            key = f"r{round_num}_{pool_name}_{i}"
+            # Přidáno číslo verze (v) do klíče
+            key = f"r{round_num}_{pool_name}_{i}_v{v}"
             winner = st.radio(
                 f"**Zápas {i+1}**", 
                 match, 
@@ -76,7 +83,7 @@ def render_pool(pool_name, matches, round_num):
                 
     return all_resolved
 
-# Vykreslení manuálních skupin s filtrací a ochranou proti odvetám
+# Vykreslení manuálních skupin
 def render_manual_pool(pool_name, teams, round_num):
     st.markdown(f"### {pool_name}")
     num_matches = len(teams) // 2
@@ -90,7 +97,7 @@ def render_manual_pool(pool_name, teams, round_num):
         selected = set()
         for i in range(num_matches):
             for j in (1, 2):
-                val = st.session_state.get(f"sel_{round_num}_{pool_name}_{i}_{j}", "---")
+                val = st.session_state.get(f"sel_{round_num}_{pool_name}_{i}_{j}_v{v}", "---")
                 if val != "---":
                     selected.add(val)
         return selected
@@ -98,12 +105,11 @@ def render_manual_pool(pool_name, teams, round_num):
     matches = []
     all_matchups_valid = True
     
-    # UI pro výběr dvojic
     for i in range(num_matches):
         c1, c2, c3 = st.columns([3, 1, 3])
         
         # Tým 1
-        key1 = f"sel_{round_num}_{pool_name}_{i}_1"
+        key1 = f"sel_{round_num}_{pool_name}_{i}_1_v{v}"
         curr1 = st.session_state.get(key1, "---")
         used_teams = get_selected_in_pool()
         avail1 = ["---"] + sorted(list(set(teams) - used_teams | ({curr1} if curr1 != "---" else set())))
@@ -115,7 +121,7 @@ def render_manual_pool(pool_name, teams, round_num):
             st.markdown("<div style='text-align: center; margin-top: 5px;'>vs</div>", unsafe_allow_html=True)
             
         # Tým 2
-        key2 = f"sel_{round_num}_{pool_name}_{i}_2"
+        key2 = f"sel_{round_num}_{pool_name}_{i}_2_v{v}"
         curr2 = st.session_state.get(key2, "---")
         used_teams = get_selected_in_pool()
         avail2 = ["---"] + sorted(list(set(teams) - used_teams | ({curr2} if curr2 != "---" else set())))
@@ -139,7 +145,7 @@ def render_manual_pool(pool_name, teams, round_num):
         all_resolved = True
         for i, match in enumerate(matches):
             with st.container(border=True):
-                key = f"rm_{round_num}_{pool_name}_{i}"
+                key = f"rm_{round_num}_{pool_name}_{i}_v{v}"
                 winner = st.radio(
                     f"**Zápas {i+1}**", 
                     match, 
@@ -163,7 +169,6 @@ st.divider()
 st.header("Kolo 1")
 done_1 = render_pool("Skupina 0-0", round_1_matches, 1)
 
-# HLAVNÍ LOGIKA KASKÁDY (pokud není kolo hotové, uložíme stav a zastavíme běh)
 if not done_1:
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump({k: v for k, v in st.session_state.items() if k != "loaded"}, f)
@@ -270,6 +275,5 @@ export_text += "⚫ **Vyřazeni (0-3):** " + ", ".join([t for t, s in scores.ite
 
 st.code(export_text, language="markdown")
 
-# Uložení stavu na úplném konci (když je celá stage hotová)
 with open(STATE_FILE, "w", encoding="utf-8") as f:
     json.dump({k: v for k, v in st.session_state.items() if k != "loaded"}, f)
