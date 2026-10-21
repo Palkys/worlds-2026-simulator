@@ -18,19 +18,27 @@ if "loaded" not in st.session_state:
             pass
     st.session_state["loaded"] = True
 
+# Proměnná, která zajistí fyzické smazání tlačítek v prohlížeči
+if "reset_key" not in st.session_state:
+    st.session_state["reset_key"] = 0
+
 # Hlavička s tlačítkem pro Reset
 col_title, col_btn = st.columns([5, 1])
 with col_title:
     st.title("🏆 LoL Worlds 2026 - Kompletní Swiss Stage")
 with col_btn:
-    # Zcela čistý reset
+    # Neprůstřelný reset pomocí změny klíčů
     if st.button("🔄 Začít znovu", use_container_width=True):
         if os.path.exists(STATE_FILE):
             try:
                 os.remove(STATE_FILE)
             except:
                 pass
+        
+        # Schováme si nové číslo pro čistý start
+        next_key = st.session_state["reset_key"] + 1
         st.session_state.clear()
+        st.session_state["reset_key"] = next_key
         st.rerun()
 
 st.write("Vyberte vítěze z každého zápasu. Váš postup se automaticky ukládá – i po obnovení stránky (F5) zůstane vše vyplněné.")
@@ -61,8 +69,8 @@ def render_pool(pool_name, matches, round_num):
     
     for i, match in enumerate(matches):
         with st.container(border=True):
-            key = f"r{round_num}_{pool_name}_{i}"
-            # Jednoduché a bezpečné nastavení (Streamlit se postará o zbytek)
+            # Přidání reset_key donutí prohlížeč tlačítko při resetu zapomenout
+            key = f"r{round_num}_{pool_name}_{i}_{st.session_state['reset_key']}"
             winner = st.radio(
                 f"**Zápas {i+1}**", 
                 match, 
@@ -92,7 +100,7 @@ def render_manual_pool(pool_name, teams, round_num):
         selected = set()
         for i in range(num_matches):
             for j in (1, 2):
-                val = st.session_state.get(f"sel_{round_num}_{pool_name}_{i}_{j}", "---")
+                val = st.session_state.get(f"sel_{round_num}_{pool_name}_{i}_{j}_{st.session_state['reset_key']}", "---")
                 if val != "---":
                     selected.add(val)
         return selected
@@ -103,8 +111,7 @@ def render_manual_pool(pool_name, teams, round_num):
     for i in range(num_matches):
         c1, c2, c3 = st.columns([3, 1, 3])
         
-        # Tým 1
-        key1 = f"sel_{round_num}_{pool_name}_{i}_1"
+        key1 = f"sel_{round_num}_{pool_name}_{i}_1_{st.session_state['reset_key']}"
         curr1 = st.session_state.get(key1, "---")
         used_teams = get_selected_in_pool()
         avail1 = ["---"] + sorted(list(set(teams) - used_teams | ({curr1} if curr1 != "---" else set())))
@@ -115,8 +122,7 @@ def render_manual_pool(pool_name, teams, round_num):
         with c2:
             st.markdown("<div style='text-align: center; margin-top: 5px;'>vs</div>", unsafe_allow_html=True)
             
-        # Tým 2
-        key2 = f"sel_{round_num}_{pool_name}_{i}_2"
+        key2 = f"sel_{round_num}_{pool_name}_{i}_2_{st.session_state['reset_key']}"
         curr2 = st.session_state.get(key2, "---")
         used_teams = get_selected_in_pool()
         avail2 = ["---"] + sorted(list(set(teams) - used_teams | ({curr2} if curr2 != "---" else set())))
@@ -140,7 +146,7 @@ def render_manual_pool(pool_name, teams, round_num):
         all_resolved = True
         for i, match in enumerate(matches):
             with st.container(border=True):
-                key = f"rm_{round_num}_{pool_name}_{i}"
+                key = f"rm_{round_num}_{pool_name}_{i}_{st.session_state['reset_key']}"
                 winner = st.radio(
                     f"**Zápas {i+1}**", 
                     match, 
